@@ -22,16 +22,16 @@ console.log('questions 2');
 let items = [300,500,451,870,62,464,200,985,100]
 // console.log(`normal price is ${items}`);
 
-for (let val of items){
-console.log(`normal price is ${val}`);
-///dfsjdkfhsdfscome
-let a = 'rushi'
+// for (let val of items){
+// console.log(`normal price is ${val}`);
+// ///dfsjdkfhsdfscome
+// let a = 'rushi'
 
-    offer = val / 10;
-    offeredPrice = val- offer;
-    // console.log(val);
-    console.log(`offer Price is ${offeredPrice}`);    
-}
+//     offer = val / 10;
+//     offeredPrice = val- offer;
+//     // console.log(val);
+//     console.log(`offer Price is ${offeredPrice}`);    
+// }
 // let i=0;
 // for (val of items){
 //     console.log(`vale at index ${i} =  ${val}`);
@@ -41,3 +41,9 @@ let a = 'rushi'
 //     console.log(`values after offer = ${items[i]}`);
 //  i++   
 // 
+
+for (let i = 0; i<items.length;i++){
+    let offer = items[i]/10;
+    items[i] -= offer;
+}
+console.log(items);
