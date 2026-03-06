@@ -26,4 +26,32 @@ console.log(join2);
 console.log(join2.unshift('mahajan'));
 console.log(join2);
 
+//slice 
+
+let arr4 =['rushi','asif','rutik']
+
+console.log(arr4.slice(0));
+
+
+//splice
+let arr5 = [10,20,54,85,45,60]
+//add element 
+// arr5.splice(2,0,200);
+
+//delete element 
+// arr5.splice(2,1); 
+
+
+
+//replace element 
+// arr5.splice(2,1,200);
+console.log(arr5);
+
+//like slice 
+
+arr5.splice(2)
+console.log(arr5);
+
+
+
 
