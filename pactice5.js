@@ -9,7 +9,7 @@ nums.forEach((nums) => {
 })
 //we can make seprate function and pass in foreach
 console.log('diff ------------------------------------');
-
+sfsafsdfds
 const sqaure =(nums) => {
     console.log(nums *nums); //nums**2
 }
