@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DROPWAVE — YouTube Downloader</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,600;0,700;1,300&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --ink:       #0a0a0a;
+  --surface:   #111111;
+  --surface2:  #1a1a1a;
+  --border:    #2a2a2a;
+  --text:      #e8e4dc;
+  --muted:     #6b6760;
+  --cyan:      #00e5ff;
+  --cyan-dim:  rgba(0,229,255,0.10);
+  --cyan-glow: rgba(0,229,255,0.30);
+  --red:       #ff3b3b;
+  --purple:    #a78bfa;
+  --green:     #22c55e;
+  --yellow:    #f59e0b;
+  --mono:      'IBM Plex Mono', monospace;
+  --display:   'Syne', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--mono);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* scanlines */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+}
+
+.shell {
+  position: relative; z-index: 1;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+
+/* ── NAV ─────────────────────────────────────── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 28px 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.wordmark { display: flex; align-items: center; gap: 14px; text-decoration: none; }
+
+.wm-icon {
+  width: 36px; height: 36px;
+  border: 2px solid var(--cyan);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 16px var(--cyan-glow), inset 0 0 10px var(--cyan-dim);
+}
+.wm-icon::before {
+  content: '';
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 7px 0 7px 12px;
+  border-color: transparent transparent transparent var(--cyan);
+  margin-left: 3px;
+}
+.wm-name { font-family: var(--display); font-size: 1.35rem; font-weight: 800; color: var(--text); letter-spacing: 0.06em; }
+.wm-name span { color: var(--cyan); }
+
+.header-meta { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; text-align: right; line-height: 1.8; }
+.header-meta b { color: var(--cyan); font-weight: 600; }
+
+/* ── HERO ────────────────────────────────────── */
+.hero {
+  padding: 64px 0 52px;
+  display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: start;
+}
+
+.hero-tag {
+  display: inline-block; font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--cyan); border: 1px solid rgba(0,229,255,0.3);
+  padding: 5px 12px; margin-bottom: 24px; position: relative;
+}
+.hero-tag::before { content: ''; position: absolute; left: -1px; top: -1px; width: 6px; height: 6px; background: var(--cyan); }
+
+h1 {
+  font-family: var(--display); font-size: clamp(2.8rem, 7vw, 5rem);
+  font-weight: 800; line-height: 0.9; letter-spacing: -0.02em; color: var(--text); margin-bottom: 22px;
+}
+h1 .accent { color: var(--cyan); text-shadow: 0 0 30px var(--cyan-glow); }
+h1 .strike { position: relative; color: var(--muted); }
+h1 .strike::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 3px; background: var(--red); }
+
+.hero-sub { font-size: 0.8rem; color: var(--muted); font-weight: 300; line-height: 1.7; max-width: 400px; font-style: italic; }
+
+.hero-status { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; }
+.status-row { display: flex; align-items: center; gap: 8px; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.08em; white-space: nowrap; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.status-dot.live { background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,0.6); animation: blink 2s ease infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── INPUT ZONE ──────────────────────────────── */
+.input-zone { margin-bottom: 12px; }
+
+.input-label {
+  font-size: 0.65rem; color: var(--muted); letter-spacing: 0.18em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.input-label::before { content: '>'; color: var(--cyan); font-weight: 700; }
+
+.input-frame {
+  display: flex; background: var(--surface); border: 1px solid var(--border);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.input-frame:focus-within {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan), 0 0 24px var(--cyan-dim);
+}
+
+#url-input {
+  flex: 1; background: none; border: none; outline: none;
+  color: var(--cyan); font-family: var(--mono); font-size: 0.85rem;
+  padding: 16px 20px; caret-color: var(--cyan); min-width: 0;
+}
+#url-input::placeholder { color: #2e2e2e; font-style: italic; }
+
+.input-actions { display: flex; align-items: stretch; border-left: 1px solid var(--border); }
+
+.btn-paste {
+  background: none; border: none; border-right: 1px solid var(--border);
+  color: var(--muted); font-family: var(--mono); font-size: 0.68rem;
+  letter-spacing: 0.1em; text-transform: uppercase; padding: 0 16px;
+  cursor: pointer; transition: color 0.15s, background 0.15s; white-space: nowrap;
+}
+.btn-paste:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+
+.btn-go {
+  background: var(--cyan); color: var(--ink); border: none;
+  font-family: var(--display); font-size: 0.8rem; font-weight: 800;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0 28px; cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; gap: 8px; white-space: nowrap;
+}
+.btn-go:hover { background: #33eaff; box-shadow: 0 0 20px var(--cyan-glow); }
+.btn-go:active { background: #00c4dd; }
+.btn-go:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+.btn-go-arrow { transition: transform 0.15s; }
+.btn-go:hover .btn-go-arrow { transform: translateX(3px); }
+
+.url-hints { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+.url-hint { font-size: 0.65rem; color: #2e2e2e; letter-spacing: 0.06em; }
+.url-hint::before { content: '// '; color: #222; }
+
+/* ── ERROR ───────────────────────────────────── */
+.error-line {
+  display: none; align-items: flex-start; gap: 10px;
+  padding: 14px 16px; background: rgba(255,59,59,0.07);
+  border-left: 2px solid var(--red); margin-bottom: 24px;
+  font-size: 0.78rem; color: #ff9090; line-height: 1.5;
+}
+.error-line.show { display: flex; }
+.error-code { font-weight: 700; color: var(--red); flex-shrink: 0; }
+
+/* ── LOADER ──────────────────────────────────── */
+.loader { display: none; flex-direction: column; gap: 14px; padding: 40px 0; }
+.loader.show { display: flex; }
+.loader-bar-wrap { height: 2px; background: var(--surface2); overflow: hidden; }
+.loader-bar {
+  height: 100%; width: 35%;
+  background: linear-gradient(90deg, var(--cyan), #0080ff, var(--cyan));
+  animation: scan 1.1s linear infinite;
+}
+@keyframes scan { 0%{transform:translateX(-100%)} 100%{transform:translateX(370%)} }
+.loader-text { font-size: 0.7rem; color: var(--muted); letter-spacing: 0.12em; }
+.loader-text::before { content: '[ '; color: var(--border); }
+.loader-text::after  { content: ' ]'; color: var(--border); }
+
+/* ── RESULT PANEL ────────────────────────────── */
+.result-panel { display: none; animation: revealUp 0.4s cubic-bezier(0.22,1,0.36,1); }
+.result-panel.show { display: block; }
+@keyframes revealUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── VIDEO STRIP ─────────────────────────────── */
+.video-strip {
+  display: grid; grid-template-columns: 240px 1fr;
+  border: 1px solid var(--border); margin-bottom: 32px;
+  background: var(--surface); position: relative; overflow: hidden;
+}
+.video-strip::before {
+  content: 'READY';
+  position: absolute; top: 12px; right: 14px;
+  font-size: 0.55rem; letter-spacing: 0.2em; color: var(--green);
+  background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); padding: 3px 8px;
+  z-index: 2;
+}
+
+.thumb-cell { position: relative; overflow: hidden; min-height: 140px; }
+.thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(0.75); transition: filter 0.3s; }
+.video-strip:hover .thumb-img { filter: saturate(1); }
+.thumb-overlay { position: absolute; inset: 0; background: linear-gradient(to right, transparent 55%, var(--surface) 100%); }
+.thumb-play {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 44px; height: 44px;
+  background: rgba(0,229,255,0.15); border: 2px solid var(--cyan);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s;
+}
+.thumb-play::before { content: ''; width: 0; height: 0; border-style: solid; border-width: 8px 0 8px 14px; border-color: transparent transparent transparent var(--cyan); margin-left: 4px; }
+.video-strip:hover .thumb-play { opacity: 1; }
+
+.meta-cell { padding: 20px 22px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.meta-title { font-family: var(--display); font-size: 1rem; font-weight: 700; line-height: 1.3; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.meta-channel { font-size: 0.72rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.meta-channel::before { content: ''; width: 5px; height: 5px; background: var(--cyan); border-radius: 50%; flex-shrink: 0; }
+.meta-stats { display: flex; gap: 12px; flex-wrap: wrap; }
+.meta-stat { font-size: 0.65rem; color: #444; letter-spacing: 0.06em; display: flex; align-items: center; gap: 5px; }
+.meta-stat span { color: var(--muted); }
+
+/* ── SECTION HEADS ───────────────────────────── */
+.section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.section-head-label { font-size: 0.62rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.section-head-line { flex: 1; height: 1px; background: var(--border); }
+.section-head-tag { font-size: 0.6rem; color: var(--border); letter-spacing: 0.1em; white-space: nowrap; padding: 2px 8px; border: 1px solid var(--border); }
+
+/* ── VIDEO QUALITY GRID ──────────────────────── */
+.quality-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 8px; margin-bottom: 32px;
+}
+
+.q-card {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 18px 16px 14px; cursor: pointer; position: relative;
+  overflow: hidden; transition: all 0.15s; text-align: left;
+}
+.q-card::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: var(--cyan); transform: scaleX(0); transform-origin: left; transition: transform 0.2s;
+}
+.q-card:hover { border-color: rgba(0,229,255,0.4); transform: translateY(-3px); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.q-card:hover::after { transform: scaleX(1); }
+.q-card:active { transform: translateY(-1px); }
+.q-card.busy { pointer-events: none; }
+.q-card.busy .q-res { color: var(--muted); }
+.q-card.busy::after { transform: scaleX(1); animation: pulse-bar 1s ease infinite; }
+@keyframes pulse-bar { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.q-res {
+  font-family: var(--display); font-size: 2.1rem; font-weight: 800;
+  line-height: 1; margin-bottom: 4px; letter-spacing: -0.02em; transition: color 0.15s;
+}
+.q-card:hover .q-res { color: var(--cyan); text-shadow: 0 0 20px var(--cyan-glow); }
+
+.q-detail { font-size: 0.65rem; color: var(--muted); font-style: italic; margin-bottom: 14px; }
+
+.q-footer { display: flex; align-items: center; justify-content: space-between; }
+
+.q-badge { font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; font-weight: 600; }
+.tag-4k  { color: var(--yellow); background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); }
+.tag-fhd { color: var(--cyan);   background: var(--cyan-dim);      border: 1px solid rgba(0,229,255,0.25); }
+.tag-hd  { color: var(--purple); background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.25); }
+.tag-sd  { color: var(--muted);  background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
+
+.q-dl-btn {
+  width: 28px; height: 28px; border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 0.8rem; transition: all 0.15s; flex-shrink: 0;
+}
+.q-card:hover .q-dl-btn { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); box-shadow: 0 0 10px var(--cyan-glow); }
+.q-card.busy .q-dl-btn { border-color: var(--yellow); color: var(--yellow); background: rgba(245,158,11,0.1); }
+
+/* ── AUDIO CARDS ─────────────────────────────── */
+.audio-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 40px; }
+
+.audio-card {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 14px 20px; cursor: pointer;
+  display: flex; align-items: center; gap: 14px;
+  transition: all 0.15s; flex: 1; min-width: 170px; position: relative; overflow: hidden;
+}
+.audio-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--purple); transform: scaleY(0); transform-origin: bottom; transition: transform 0.2s;
+}
+.audio-card:hover { border-color: rgba(167,139,250,0.4); transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,0.4); }
+.audio-card:hover::before { transform: scaleY(1); }
+.audio-card.busy { pointer-events: none; opacity: 0.5; }
+
+.audio-vis { display: flex; gap: 2px; align-items: center; height: 20px; }
+.audio-vis i { display: block; width: 3px; border-radius: 2px; background: var(--purple); animation: wv 1.1s ease infinite; }
+.audio-vis i:nth-child(1){height:8px;animation-delay:0.0s}
+.audio-vis i:nth-child(2){height:16px;animation-delay:0.2s}
+.audio-vis i:nth-child(3){height:10px;animation-delay:0.1s}
+.audio-vis i:nth-child(4){height:20px;animation-delay:0.3s}
+.audio-vis i:nth-child(5){height:6px;animation-delay:0.15s}
+@keyframes wv { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(0.3)} }
+
+.audio-info { flex: 1; }
+.audio-format { font-family: var(--display); font-size: 1rem; font-weight: 700; color: var(--text); }
+.audio-desc { font-size: 0.65rem; color: var(--muted); font-style: italic; margin-top: 1px; }
+.audio-arrow { color: var(--muted); font-size: 0.8rem; transition: color 0.15s, transform 0.15s; }
+.audio-card:hover .audio-arrow { color: var(--purple); transform: translateX(3px); }
+
+/* ── HOW IT WORKS ────────────────────────────── */
+.how-section { border-top: 1px solid var(--border); padding: 48px 0 0; }
+.how-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; margin-top: 28px; }
+.how-num { font-family: var(--display); font-size: 3rem; font-weight: 800; color: var(--border); line-height: 1; }
+.how-title { font-size: 0.8rem; font-weight: 600; color: var(--text); letter-spacing: 0.06em; margin: 8px 0 4px; }
+.how-desc { font-size: 0.72rem; color: var(--muted); font-weight: 300; line-height: 1.6; font-style: italic; }
+
+/* ── FOOTER ──────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border); padding: 24px 0 0; margin-top: 48px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 0.65rem; color: #333; letter-spacing: 0.1em; flex-wrap: wrap; gap: 10px;
+}
+footer a { color: #444; text-decoration: none; transition: color 0.15s; }
+footer a:hover { color: var(--cyan); }
+footer .hi { color: var(--cyan); }
+
+/* ── TOAST ───────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-left: 2px solid var(--cyan);
+  font-family: var(--mono); font-size: 0.75rem; color: var(--text);
+  padding: 12px 18px; max-width: 360px; z-index: 9999;
+  opacity: 0; transform: translateX(20px); transition: all 0.25s; pointer-events: none; line-height: 1.5;
+}
+#toast.show { opacity: 1; transform: translateX(0); }
+#toast.err  { border-left-color: var(--red); color: #ff9090; }
+#toast.ok   { border-left-color: var(--green); }
+#toast.info { border-left-color: var(--yellow); }
+
+/* ── RESPONSIVE ──────────────────────────────── */
+@media(max-width:640px){
+  .hero{grid-template-columns:1fr;gap:24px;padding:44px 0 32px}
+  .hero-status{flex-direction:row;flex-wrap:wrap}
+  .video-strip{grid-template-columns:1fr}
+  .thumb-cell{height:180px}
+  .thumb-overlay{background:linear-gradient(to bottom,transparent 50%,var(--surface) 100%)}
+  .quality-grid{grid-template-columns:repeat(2,1fr)}
+  .how-grid{grid-template-columns:1fr;gap:20px}
+  .input-frame{flex-wrap:wrap}
+  .input-actions{width:100%;border-left:none;border-top:1px solid var(--border)}
+  .btn-go{flex:1;justify-content:center;padding:14px}
+  header{flex-direction:column;gap:10px;text-align:center}
+  .header-meta{text-align:center}
+  .audio-row{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- NAV -->
+  <header>
+    <a href="#" class="wordmark">
+      <div class="wm-icon"></div>
+      <span class="wm-name">DROP<span>WAVE</span></span>
+    </a>
+    <div class="header-meta">
+      Powered by <b>nuubi API</b><br>
+      Free · No signup · Works in browser
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-left">
+      <div class="hero-tag">YouTube Downloader</div>
+      <h1>Download<br><span class="accent">Any</span> Video.<br>Any <span class="strike">Price</span> Quality.</h1>
+      <p class="hero-sub">Paste a YouTube link. Pick your format. Get your file instantly — no accounts, no limits, no nonsense.</p>
+    </div>
+    <div class="hero-status">
+      <div class="status-row"><span class="status-dot live"></span><span>API ONLINE</span></div>
+      <div class="status-row"><span class="status-dot live"></span><span>4K SUPPORTED</span></div>
+      <div class="status-row"><span class="status-dot live"></span><span>MP3 READY</span></div>
+    </div>
+  </section>
+
+  <!-- INPUT -->
+  <div class="input-zone">
+    <div class="input-label">Enter YouTube URL</div>
+    <div class="input-frame">
+      <input id="url-input" type="url" placeholder="https://youtube.com/watch?v=..." autocomplete="off" spellcheck="false"/>
+      <div class="input-actions">
+        <button class="btn-paste" onclick="pasteURL()">PASTE</button>
+        <button class="btn-go" id="btn-go" onclick="processURL()">
+          <span>FETCH</span><span class="btn-go-arrow">→</span>
+        </button>
+      </div>
+    </div>
+    <div class="url-hints">
+      <span class="url-hint">youtube.com/watch?v=</span>
+      <span class="url-hint">youtu.be/...</span>
+      <span class="url-hint">youtube.com/shorts/</span>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-line" id="error-line">
+    <span class="error-code">ERR //</span>
+    <span id="error-msg"></span>
+  </div>
+
+  <!-- LOADER -->
+  <div class="loader" id="loader">
+    <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+    <div class="loader-text" id="loader-text">Loading video info…</div>
+  </div>
+
+  <!-- RESULT PANEL -->
+  <div class="result-panel" id="result-panel">
+
+    <!-- Video info strip -->
+    <div class="video-strip">
+      <div class="thumb-cell">
+        <img class="thumb-img" id="thumb-img" src="" alt="">
+        <div class="thumb-overlay"></div>
+        <div class="thumb-play"></div>
+      </div>
+      <div class="meta-cell">
+        <div class="meta-title" id="meta-title">Loading title…</div>
+        <div class="meta-channel" id="meta-channel">YouTube</div>
+        <div class="meta-stats" id="meta-stats"></div>
+      </div>
+    </div>
+
+    <!-- Video formats -->
+    <div class="section-head">
+      <span class="section-head-label">Video Quality</span>
+      <div class="section-head-line"></div>
+      <span class="section-head-tag">MP4 · H.264</span>
+    </div>
+    <div class="quality-grid" id="quality-grid"></div>
+
+    <!-- Audio formats -->
+    <div class="section-head">
+      <span class="section-head-label">Audio Only</span>
+      <div class="section-head-line"></div>
+      <span class="section-head-tag">MP3 · AAC</span>
+    </div>
+    <div class="audio-row" id="audio-row"></div>
+
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how-section">
+    <div class="section-head">
+      <span class="section-head-label">How It Works</span>
+      <div class="section-head-line"></div>
+    </div>
+    <div class="how-grid">
+      <div class="how-item">
+        <div class="how-num">01</div>
+        <div class="how-title">Paste Your Link</div>
+        <div class="how-desc">Any YouTube URL — regular videos, shorts, or playlists. Copy from your browser bar and paste it in.</div>
+      </div>
+      <div class="how-item">
+        <div class="how-num">02</div>
+        <div class="how-title">Choose Quality</div>
+        <div class="how-desc">Select from 4K, 1080p, 720p, 480p, 360p, 240p — or extract audio as MP3 at various bitrates.</div>
+      </div>
+      <div class="how-item">
+        <div class="how-num">03</div>
+        <div class="how-title">Download Direct</div>
+        <div class="how-desc">The nuubi API fetches and serves the file. Your browser saves it to your device instantly.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>DROPWAVE &copy; 2025</span>
+    <span>Powered by <span class="hi">nuubi API</span> via y2mate</span>
+    <span>Personal use only &middot; Respect copyright</span>
+  </footer>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+//  CONFIG — nuubi y2mate API
+//  GET https://nuubi.herokuapp.com/api/y2mate/download/<type>?url=<yt_url>&quality=<q>
+// ─────────────────────────────────────────────────────────────────────
+const NUUBI = 'https://nuubi.herokuapp.com/api/y2mate/download';
+
+const VIDEO_QUALITIES = [
+  { label:'4K',    quality:'2160p', badge:'4K',  cls:'tag-4k',  detail:'2160p Ultra HD · MP4' },
+  { label:'1080p', quality:'1080p', badge:'FHD', cls:'tag-fhd', detail:'Full HD · MP4' },
+  { label:'720p',  quality:'720p',  badge:'HD',  cls:'tag-hd',  detail:'HD Ready · MP4' },
+  { label:'480p',  quality:'480p',  badge:'SD',  cls:'tag-sd',  detail:'Standard · MP4' },
+  { label:'360p',  quality:'360p',  badge:'LOW', cls:'tag-sd',  detail:'Low · MP4' },
+  { label:'240p',  quality:'240p',  badge:'MIN', cls:'tag-sd',  detail:'Minimum · MP4' },
+];
+
+const AUDIO_QUALITIES = [
+  { label:'MP3',    type:'mp3', quality:'320', desc:'320 kbps · Best quality' },
+  { label:'MP3 HQ', type:'mp3', quality:'192', desc:'192 kbps · High quality' },
+  { label:'MP3 LQ', type:'mp3', quality:'128', desc:'128 kbps · Smaller file' },
+];
+
+let currentURL  = '';
+let currentID   = '';
+
+// ─── TOAST ───────────────────────────────────────────────────────────
+let _tt;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(_tt);
+  _tt = setTimeout(() => el.className = '', 4000);
+}
+
+// ─── UI HELPERS ──────────────────────────────────────────────────────
+function setLoader(v, txt = 'Loading…') {
+  document.getElementById('loader').classList.toggle('show', v);
+  document.getElementById('loader-text').textContent = txt;
+}
+function setResult(v) { document.getElementById('result-panel').classList.toggle('show', v); }
+function setError(msg) {
+  const el = document.getElementById('error-line');
+  document.getElementById('error-msg').textContent = msg;
+  el.classList.toggle('show', !!msg);
+}
+
+// ─── PASTE ───────────────────────────────────────────────────────────
+async function pasteURL() {
+  try {
+    const t = await navigator.clipboard.readText();
+    document.getElementById('url-input').value = t.trim();
+    toast('// Pasted from clipboard');
+  } catch {
+    toast('// Use Ctrl+V / Cmd+V to paste manually', 'err');
+  }
+}
+
+// ─── EXTRACT VIDEO ID ─────────────────────────────────────────────────
+function extractID(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('youtu.be'))   return u.pathname.slice(1).split(/[?&#]/)[0];
+    if (u.searchParams.get('v'))           return u.searchParams.get('v');
+    const s = u.pathname.match(/\/shorts\/([A-Za-z0-9_-]{11})/);
+    if (s) return s[1];
+    const l = u.pathname.match(/\/live\/([A-Za-z0-9_-]{11})/);
+    if (l) return l[1];
+  } catch {}
+  const m = url.match(/[A-Za-z0-9_-]{11}/);
+  return m ? m[0] : null;
+}
+
+function isYouTubeURL(url) {
+  return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)/.test(url);
+}
+
+// ─── MAIN PROCESS ────────────────────────────────────────────────────
+async function processURL() {
+  const raw = document.getElementById('url-input').value.trim();
+
+  if (!raw)              { setError('Please enter a YouTube URL.'); return; }
+  if (!isYouTubeURL(raw)){ setError('Not a valid YouTube URL. It should start with youtube.com or youtu.be'); return; }
+
+  const id = extractID(raw);
+  if (!id) { setError('Could not find a video ID in that URL. Try copying directly from YouTube.'); return; }
+
+  setError('');
+  setResult(false);
+  setLoader(true, 'Fetching video info…');
+  document.getElementById('btn-go').disabled = true;
+
+  currentURL = raw;
+  currentID  = id;
+
+  // Thumbnail — served from YouTube CDN, no CORS issues
+  const thumbURL = `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`;
+  const thumbFB  = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+
+  // Set thumbnail immediately
+  const img = document.getElementById('thumb-img');
+  img.src = thumbURL;
+  img.onerror = () => { img.onerror = null; img.src = thumbFB; };
+
+  // Try fetching title via noembed (CORS-friendly proxy)
+  document.getElementById('meta-title').textContent = 'Loading title…';
+  document.getElementById('meta-channel').textContent = 'YouTube Video';
+  document.getElementById('meta-stats').innerHTML = `
+    <div class="meta-stat">ID <span>${id}</span></div>
+    <div class="meta-stat">API <span>nuubi / y2mate</span></div>
+  `;
+
+  // Fetch title in background (non-blocking)
+  fetchTitle(raw);
+
+  // Render format cards
+  renderFormats(raw);
+
+  setLoader(false);
+  setResult(true);
+  document.getElementById('btn-go').disabled = false;
+  toast('// Select a quality to start downloading', 'info');
+}
+
+// ─── FETCH TITLE (background, non-blocking) ───────────────────────────
+async function fetchTitle(url) {
+  try {
+    const r = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.title)       document.getElementById('meta-title').textContent   = d.title;
+    if (d.author_name) document.getElementById('meta-channel').textContent = d.author_name;
+    if (d.title) document.getElementById('meta-stats').innerHTML = `
+      <div class="meta-stat">FORMAT <span>MP4 / MP3</span></div>
+      <div class="meta-stat">API <span>nuubi / y2mate</span></div>
+      ${d.provider_name ? `<div class="meta-stat">SRC <span>${d.provider_name}</span></div>` : ''}
+    `;
+  } catch {
+    // silently fail — title is nice-to-have
+  }
+}
+
+// ─── RENDER QUALITY CARDS ─────────────────────────────────────────────
+function renderFormats(url) {
+  // Video cards
+  const grid = document.getElementById('quality-grid');
+  grid.innerHTML = '';
+  VIDEO_QUALITIES.forEach(q => {
+    const card = document.createElement('div');
+    card.className = 'q-card';
+    card.innerHTML = `
+      <div class="q-res">${q.label}</div>
+      <div class="q-detail">${q.detail}</div>
+      <div class="q-footer">
+        <span class="q-badge ${q.cls}">${q.badge}</span>
+        <span class="q-dl-btn">↓</span>
+      </div>
+    `;
+    card.addEventListener('click', () => downloadVideo(url, q, card));
+    grid.appendChild(card);
+  });
+
+  // Audio cards
+  const aRow = document.getElementById('audio-row');
+  aRow.innerHTML = '';
+  AUDIO_QUALITIES.forEach(a => {
+    const card = document.createElement('div');
+    card.className = 'audio-card';
+    card.innerHTML = `
+      <div class="audio-vis"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="audio-info">
+        <div class="audio-format">${a.label}</div>
+        <div class="audio-desc">${a.desc}</div>
+      </div>
+      <span class="audio-arrow">→</span>
+    `;
+    card.addEventListener('click', () => downloadAudio(url, a, card));
+    aRow.appendChild(card);
+  });
+}
+
+// ─── DOWNLOAD VIDEO ───────────────────────────────────────────────────
+// GET https://nuubi.herokuapp.com/api/y2mate/download/mp4?url=<yt_url>&quality=<quality>
+function downloadVideo(url, q, cardEl) {
+  if (cardEl.classList.contains('busy')) return;
+  cardEl.classList.add('busy');
+  const dlBtn = cardEl.querySelector('.q-dl-btn');
+  if (dlBtn) dlBtn.textContent = '…';
+
+  toast(`// Fetching ${q.label} video link…`, 'info');
+
+  const apiURL = `${NUUBI}/mp4?url=${encodeURIComponent(url)}&quality=${encodeURIComponent(q.quality)}`;
+
+  triggerDownload(apiURL, `video_${q.quality}.mp4`, cardEl, dlBtn, '↓');
+}
+
+// ─── DOWNLOAD AUDIO ───────────────────────────────────────────────────
+// GET https://nuubi.herokuapp.com/api/y2mate/download/mp3?url=<yt_url>&quality=<bitrate>
+function downloadAudio(url, a, cardEl) {
+  if (cardEl.classList.contains('busy')) return;
+  cardEl.classList.add('busy');
+
+  toast(`// Fetching ${a.label} (${a.quality}kbps) link…`, 'info');
+
+  const apiURL = `${NUUBI}/mp3?url=${encodeURIComponent(url)}&quality=${encodeURIComponent(a.quality)}`;
+
+  triggerDownload(apiURL, `audio_${a.quality}kbps.mp3`, cardEl, null, null);
+}
+
+// ─── CORE DOWNLOAD TRIGGER ────────────────────────────────────────────
+async function triggerDownload(apiURL, filename, cardEl, dlBtn, resetIcon) {
+  try {
+    // Call nuubi API
+    const res = await fetch(apiURL, { method: 'GET' });
+
+    if (!res.ok) {
+      let errMsg = `Server returned ${res.status}`;
+      try { const d = await res.json(); errMsg = d.message || d.error || errMsg; } catch {}
+      throw new Error(errMsg);
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+
+    // If response is JSON → it contains a redirect URL
+    if (contentType.includes('application/json')) {
+      const data = await res.json();
+
+      // nuubi/y2mate returns { link, url, download_url, dlink } depending on version
+      const link = data.link || data.url || data.download_url || data.dlink || data.downloadUrl;
+
+      if (!link) {
+        console.warn('API response:', data);
+        throw new Error(data.message || data.error || 'No download link in API response. The video may be unavailable.');
+      }
+
+      openLink(link, filename);
+
+    } else {
+      // Direct binary stream — blob it and save
+      const blob = await res.blob();
+      if (blob.size < 1000) throw new Error('File too small — the video may be unavailable or region-locked.');
+      const objURL = URL.createObjectURL(blob);
+      openLink(objURL, filename);
+      setTimeout(() => URL.revokeObjectURL(objURL), 10000);
+    }
+
+    toast(`// Download started! Check your browser downloads ✓`, 'ok');
+
+  } catch (err) {
+    const msg = friendlyErr(err.message);
+    toast(`// ${msg}`, 'err');
+    setError(msg);
+    console.error('[nuubi API]', err);
+  } finally {
+    setTimeout(() => {
+      cardEl.classList.remove('busy');
+      if (dlBtn && resetIcon) dlBtn.textContent = resetIcon;
+    }, 2500);
+  }
+}
+
+// ─── OPEN / TRIGGER LINK ─────────────────────────────────────────────
+function openLink(href, filename) {
+  const a = document.createElement('a');
+  a.href     = href;
+  a.download = filename;
+  a.target   = '_blank';
+  a.rel      = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ─── FRIENDLY ERROR MESSAGES ─────────────────────────────────────────
+function friendlyErr(msg) {
+  if (!msg) return 'Something went wrong. Please try again.';
+  const m = msg.toLowerCase();
+  if (m.includes('age') || m.includes('login'))   return 'Age-restricted video — cannot be downloaded.';
+  if (m.includes('private'))                       return 'This video is private.';
+  if (m.includes('live'))                          return 'Live streams cannot be downloaded yet.';
+  if (m.includes('unavailable') || m.includes('removed')) return 'Video is unavailable or has been removed.';
+  if (m.includes('region') || m.includes('geo'))  return 'Video is geo-restricted in the API\'s region.';
+  if (m.includes('fetch') || m.includes('network') || m.includes('failed to fetch')) {
+    return 'Network error — the API may be temporarily down. Please try again in a moment.';
+  }
+  if (m.includes('no download link'))              return 'No download link found. The video may be restricted or unavailable.';
+  if (m.includes('too small'))                     return 'Invalid response — video may be unavailable or region-locked.';
+  if (m.includes('500') || m.includes('502') || m.includes('503')) {
+    return 'nuubi API is temporarily unavailable (server error). Try again in a moment.';
+  }
+  return msg.length > 120 ? msg.slice(0, 120) + '…' : msg;
+}
+
+// ─── KEYBOARD SHORTCUT ───────────────────────────────────────────────
+document.getElementById('url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') processURL();
+});
+
+// ─── URL PARAM AUTO-FILL ─────────────────────────────────────────────
+const p = new URLSearchParams(location.search).get('url');
+if (p) { document.getElementById('url-input').value = p; processURL(); }
+</script>
+</body>
+</html>
